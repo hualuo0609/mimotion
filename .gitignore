@@ -1,2 +1,4 @@
 /.idea/
 __pycache__/
+step_state.json
+.step_state.json.*.lock

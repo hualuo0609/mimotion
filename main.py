@@ -14,6 +14,7 @@ import os
 from util.aes_help import encrypt_data, decrypt_data
 import util.zepp_helper as zeppHelper
 import util.push_util as push_util
+from util.step_state import DailyStepState
 
 # 获取默认值转int
 def get_int_value_default(_config: dict, _key, default):
@@ -182,9 +183,22 @@ class MiMotionRunner:
         if app_token is None:
             return "登陆失败！", False
 
-        step = str(random.randint(min_step, max_step))
-        self.log_str += f"已设置为随机步数范围({min_step}~{max_step}) 随机值:{step}\n"
-        ok, msg = zeppHelper.post_fake_brand_data(step, app_token, self.user_id)
+        run_date = get_beijing_time().date()
+        step, ok, msg = daily_step_state.submit(
+            self.user,
+            run_date,
+            min_step,
+            max_step,
+            daily_max_step,
+            lambda target_step: zeppHelper.post_fake_brand_data(
+                target_step,
+                app_token,
+                self.user_id,
+                data_date=run_date.isoformat(),
+            ),
+        )
+        step = str(step)
+        self.log_str += f"按时间随机范围({min_step}~{max_step}) 同日累增目标值:{step}\n"
         return f"修改步数（{step}）[" + msg + "]", ok
 
 
@@ -315,6 +329,9 @@ if __name__ == "__main__":
             print("未正确配置账号密码，无法执行")
             exit(1)
         min_step, max_step = get_min_max_by_time()
+        daily_max_step = get_int_value_default(config, 'MAX_STEP', 25000)
+        step_state_path = os.environ.get('STEP_STATE_FILE', 'step_state.json')
+        daily_step_state = DailyStepState(step_state_path)
         use_concurrent = config.get('USE_CONCURRENT')
         if use_concurrent is not None and use_concurrent == 'True':
             use_concurrent = True
